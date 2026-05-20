@@ -259,6 +259,11 @@ async function startServer() {
   // 4. Static Uploads
   app.use("/uploads", express.static(uploadDir));
 
+  // --- Start Listening NOW to avoid platform timeout ---
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[SERVER] Express instance listening on port ${PORT}`);
+  });
+
   // Startup check for Firestore (Non-blocking)
   const startupConfig = getFirebaseConfig();
   if (startupConfig?.projectId && startupConfig?.apiKey) {
@@ -1363,8 +1368,8 @@ async function startServer() {
     }
   });
 
-  // -- Improved Seeding Section --
-  const seedUser = (id: string, no: string, name: string, pass: string, role: string, vil: string) => {
+  // -- Improved Seeding Section (Non-blocking) --
+  const seedUser = async (id: string, no: string, name: string, pass: string, role: string, vil: string) => {
     try {
       const existing = db.prepare("SELECT * FROM users WHERE no_anggota = ?").get(no) as any;
       if (!existing) {
@@ -1400,18 +1405,23 @@ async function startServer() {
     }
   };
 
-  // Seed Admin
-  seedUser(uuidv4(), "admin", "Admin System", "Anggra09", "ADMIN", "PUSAT");
-  
-  // Seed Alif
-  seedUser(uuidv4(), "alif", "Alif User", "password123", "PAC", "PUSAT");
+  // Run Seeding in background
+  (async () => {
+    console.log("[SEED] Starting background seeding...");
+    // Seed Admin
+    await seedUser(uuidv4(), "admin", "Admin System", "Anggra09", "ADMIN", "PUSAT");
+    
+    // Seed Alif
+    await seedUser(uuidv4(), "alif", "Alif User", "password123", "PAC", "PUSAT");
 
-  // Seed default configs
-  const configExists = db.prepare("SELECT count(*) as count FROM config WHERE key = 'orgName'").get() as { count: number };
-  if (configExists.count === 0) {
-    db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("orgName", "SIMO - SISTEM INFORMASI MANAJEMEN ORGANISASI");
-    db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("logoUrl", "");
-  }
+    // Seed default configs
+    const configExists = db.prepare("SELECT count(*) as count FROM config WHERE key = 'orgName'").get() as { count: number };
+    if (configExists.count === 0) {
+        db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("orgName", "SIMO - SISTEM INFORMASI MANAJEMEN ORGANISASI");
+        db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("logoUrl", "");
+    }
+    console.log("[SEED] Background seeding completed.");
+  })();
 
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('Server Internal Error:', err);
@@ -1438,27 +1448,24 @@ async function startServer() {
 
   // --- Vite / Production Serve ---
   if (process.env.NODE_ENV !== "production") {
+    console.log("[VITE] Initializing Vite middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
+    console.log("[VITE] Middleware ready.");
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    } else {
+      console.warn("[SERVER] Warning: dist folder not found in production mode!");
+    }
   }
-
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error('Server Error:', err);
-    res.status(500).json({ message: err.message || 'Internal Server Error' });
-  });
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
 startServer().catch(err => {
