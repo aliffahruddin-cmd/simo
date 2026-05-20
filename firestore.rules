@@ -1,0 +1,99 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      // Mandate email verification for cloud security
+      return request.auth.token.email_verified == true;
+    }
+
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // Bootstrap admin from user email provided in metadata
+      // Removed email_verified requirement to prevent blocking during setup
+      return isSignedIn() && (
+        (
+          request.auth.token.email == 'asp.onshop@gmail.com' ||
+          request.auth.token.email == 'aliffahruddin@gmail.com'
+        ) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'USER') in ['ADMIN', 'DPP'])
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      let requiredFields = ['no_anggota', 'nama_lengkap', 'role', 'wilayah', 'created_at'];
+      return data.keys().hasAll(requiredFields)
+        && data.keys().size() <= 10
+        && data.nama_lengkap is string && data.nama_lengkap.size() <= 200
+        && data.no_anggota is string && data.no_anggota.size() <= 50
+        && data.role in ['ADMIN', 'DPP', 'DPD', 'DPC', 'PAC', 'USER']
+        && data.wilayah is string && data.wilayah.size() <= 100
+        && (data.get('email', null) == null || (data.email is string && data.email.size() <= 256))
+        ;
+    }
+
+    // --- Collection Routes ---
+    
+    // Dedicated path for connectivity health checks
+    match /health_check/{id} {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      // Path Hardening
+      allow get: if isValidId(userId) && (isUser(userId) || isAdmin());
+      
+      // List hardening: Prevent blanket scraping
+      allow list: if isAdmin();
+
+      // Write operations
+      allow create: if isValidId(userId) && isValidUser(incoming()) && (
+        (isUser(userId) && incoming().role == 'PAC') ||
+        isAdmin()
+      ) && (incoming().created_at == request.time);
+
+      allow update: if isValidId(userId) && (
+        // Admins can update everything
+        (isAdmin() && isValidUser(incoming())) ||
+        // Users can update their own profile fields except role/created_at
+        (isUser(userId) && isValidUser(incoming()) 
+          && incoming().role == existing().role
+          && incoming().no_anggota == existing().no_anggota
+          && incoming().created_at == existing().created_at
+          && incoming().diff(existing()).affectedKeys().hasOnly(['nama_lengkap', 'wilayah', 'email'])
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+  }
+}

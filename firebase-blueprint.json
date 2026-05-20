@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and sync data",
+      "type": "object",
+      "properties": {
+        "no_anggota": {
+          "type": "string",
+          "description": "Member identification number"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "nama_lengkap": {
+          "type": "string",
+          "description": "Full name"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["ADMIN", "DPP", "DPD", "DPC", "PAC"],
+          "description": "User access role"
+        },
+        "wilayah": {
+          "type": "string",
+          "description": "Geographic territory"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["no_anggota", "nama_lengkap", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles synced from SQLite"
+    }
+  }
+}

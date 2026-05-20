@@ -1,0 +1,87 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: "Inter", sans-serif;
+    --font-sans: "Inter", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+    
+    --color-background: #f8fafc;
+    --color-foreground: #0f172a;
+    
+    --color-card: #ffffff;
+    --color-card-foreground: #0f172a;
+    
+    --color-popover: #ffffff;
+    --color-popover-foreground: #0f172a;
+    
+    --color-primary: #2563eb;
+    --color-primary-foreground: #ffffff;
+    
+    --color-secondary: #f1f5f9;
+    --color-secondary-foreground: #0f172a;
+    
+    --color-muted: #f1f5f9;
+    --color-muted-foreground: #64748b;
+    
+    --color-accent: #f1f5f9;
+    --color-accent-foreground: #0f172a;
+    
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #ffffff;
+    
+    --color-border: #e2e8f0;
+    --color-input: #e2e8f0;
+    --color-ring: #3b82f6;
+
+    --radius-sm: 0.125rem;
+    --radius-md: 0.25rem;
+    --radius-lg: 0.375rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  .card-dense {
+    @apply bg-white border border-slate-200 shadow-sm rounded-md overflow-hidden transition-shadow duration-200 hover:shadow-md;
+  }
+  
+  .table-dense {
+    @apply w-full text-left text-xs;
+  }
+  
+  .table-dense th {
+    @apply px-3 py-2 bg-slate-50 font-black text-slate-500 uppercase tracking-wider border-b border-slate-200;
+  }
+  
+  .table-dense td {
+    @apply px-3 py-2 border-b border-slate-100 text-slate-700 font-medium;
+  }
+
+  .stat-card {
+    @apply p-4 bg-white border border-slate-200 rounded-md flex flex-col gap-1;
+  }
+
+  .stat-value {
+    @apply text-2xl font-black text-slate-900 tracking-tighter;
+  }
+
+  .stat-label {
+    @apply text-[10px] font-bold text-slate-500 uppercase tracking-widest;
+  }
+}
