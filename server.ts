@@ -225,15 +225,25 @@ async function startServer() {
     console.log("[FIREBASE] Services initialized in background.");
   })();
 
-  // 1. Permissive CORS (RELY ON THIS EXCLUSIVELY)
-  app.use(cors({
-    origin: (origin, callback) => callback(null, true), // Allow all origins
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    credentials: true,
-    maxAge: 86400
-  }));
+  // 1. Dynamic Permissive CORS (Manual implementation for absolute reliability)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Range");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Range, X-Content-Range, Content-Length, Accept-Ranges");
+    res.setHeader("Access-Control-Max-Age", "86400");
+
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  });
 
   // 2. Global logger and JSON enforcer
   app.use((req, res, next) => {

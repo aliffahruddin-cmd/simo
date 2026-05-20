@@ -99,9 +99,10 @@ async function testConnection() {
     }
   }
 }
-if (firebaseConfig.apiKey) {
-    testConnection();
-}
+// Test connection can be run when explicit troubleshooting is needed, but we do not auto-invoke it on mount to avoid unnecessary background connection attempts in sandboxed iframes.
+// if (firebaseConfig.apiKey) {
+//     testConnection();
+// }
 
 export enum OperationType {
   CREATE = 'create',
