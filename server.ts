@@ -228,7 +228,7 @@ async function startServer() {
   // 1. Dynamic Permissive CORS (Manual implementation for absolute reliability)
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
+    if (origin && origin !== "null" && origin !== "*") {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
     } else {
@@ -238,6 +238,7 @@ async function startServer() {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Range");
     res.setHeader("Access-Control-Expose-Headers", "Content-Range, X-Content-Range, Content-Length, Accept-Ranges");
     res.setHeader("Access-Control-Max-Age", "86400");
+    res.setHeader("Vary", "Origin");
 
     if (req.method === "OPTIONS") {
       return res.status(200).end();
@@ -365,7 +366,7 @@ async function startServer() {
                 id: decodedToken.uid,
                 email: email,
                 no_anggota: 'G-' + decodedToken.uid.substring(0, 5),
-                role: (email && email === 'asp.onshop@gmail.com') ? 'ADMIN' : "PAC",
+                role: (email && email === 'aliffahruddin@gmail.com') ? 'ADMIN' : "PAC",
                 wilayah: "PUSAT",
                 nama_lengkap: decodedToken.name || "Firebase Guest",
                 extra_email: email

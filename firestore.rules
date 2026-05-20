@@ -27,7 +27,6 @@ service cloud.firestore {
       // Removed email_verified requirement to prevent blocking during setup
       return isSignedIn() && (
         (
-          request.auth.token.email == 'asp.onshop@gmail.com' ||
           request.auth.token.email == 'aliffahruddin@gmail.com'
         ) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 

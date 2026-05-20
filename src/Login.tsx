@@ -220,7 +220,7 @@ export default function Login() {
                       <Input 
                         id="noAnggota" 
                         type="text"
-                        placeholder="Contoh: 12345" 
+                        placeholder="Contoh: admin" 
                         className="pl-12 h-14 text-xs font-bold border-white/5 bg-black/20 text-white focus:bg-black/40 transition-all rounded-2xl border-2 focus:border-red-600/30 tracking-widest placeholder:text-slate-700" 
                         value={noAnggota}
                         onChange={(e) => setNoAnggota(e.target.value)}
@@ -286,6 +286,34 @@ export default function Login() {
             </div>
           </form>
         </div>
+
+        {/* Informational Guidance Box for Credentials */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-6 bg-slate-900/40 backdrop-blur-3xl rounded-[1.5rem] p-6 border border-white/5 text-center space-y-4"
+        >
+          <div className="flex items-center justify-center gap-2 text-red-500">
+            <ShieldCheck className="w-4 h-4 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Kredensial Akses Pengguna</span>
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium leading-relaxed">
+            Gunakan tab <span className="text-white font-bold">No. Anggota</span> dengan kredensial berikut untuk masuk ke sistem:
+          </p>
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-left">
+              <span className="text-[9px] font-black text-red-500 uppercase tracking-widest block mb-1">Akses Admin</span>
+              <p className="text-[10px] text-slate-300 font-bold mb-0.5">No: <code className="text-white bg-slate-800/80 px-1 py-0.5 rounded font-mono">admin</code></p>
+              <p className="text-[10px] text-slate-300 font-bold">Pass: <code className="text-white bg-slate-800/80 px-1 py-0.5 rounded font-mono">Anggra09</code></p>
+            </div>
+            <div className="bg-black/30 p-3 rounded-xl border border-white/5 text-left">
+              <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Akses Anggota</span>
+              <p className="text-[10px] text-slate-300 font-bold mb-0.5">No: <code className="text-white bg-slate-800/80 px-1 py-0.5 rounded font-mono">alif</code></p>
+              <p className="text-[10px] text-slate-300 font-bold">Pass: <code className="text-white bg-slate-800/80 px-1 py-0.5 rounded font-mono">password123</code></p>
+            </div>
+          </div>
+        </motion.div>
 
         <div className="mt-12 flex flex-col items-center gap-5 text-center">
           <div className="flex items-center gap-4 opacity-30">

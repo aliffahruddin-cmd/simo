@@ -20,20 +20,26 @@ const getApiUrl = (): string => {
     // or we are on googleusercontent.com, withgoogle.com, etc.), we MUST use the absolute backend URL.
     // Otherwise, standard relative fetches will be made to the sandbox target (e.g. googleusercontent.com/api/...) and fail.
     if (!isDirectBackend) {
+      const ancestorOrigins = (window.location as any).ancestorOrigins;
       const isPre = 
         href.includes('ais-pre') || 
         href.includes('-pre-') || 
-        href.includes('pre-') ||
         (typeof document !== 'undefined' && (
           document.referrer.includes('ais-pre') ||
-          document.referrer.includes('-pre-') ||
-          document.referrer.includes('pre-')
+          document.referrer.includes('-pre-')
+        )) ||
+        (ancestorOrigins && Array.from(ancestorOrigins).some((origin: any) => 
+          origin.includes('ais-pre') || origin.includes('-pre-')
         ));
-      if (isPre) {
-        return 'https://ais-pre-lygy44gzfdl3sscb7yvlge-643827784442.asia-southeast1.run.app';
-      } else {
-        return 'https://ais-dev-lygy44gzfdl3sscb7yvlge-643827784442.asia-southeast1.run.app';
-      }
+      
+      const targetUrl = isPre
+        ? 'https://ais-pre-lygy44gzfdl3sscb7yvlge-643827784442.asia-southeast1.run.app'
+        : 'https://ais-dev-lygy44gzfdl3sscb7yvlge-643827784442.asia-southeast1.run.app';
+
+      console.log(`[API_URL] Sandboxed env. Referrer: "${typeof document !== 'undefined' ? document.referrer : ''}", IsPre: ${isPre}. Routing to: ${targetUrl}`);
+      return targetUrl;
+    } else {
+      console.log(`[API_URL] Direct backend env. Hostname: "${hostname}". Routing relatively.`);
     }
   }
   return '';

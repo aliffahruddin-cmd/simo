@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   noAnggota: 'G-' + firebaseUser.uid.substring(0, 5),
                   namaLengkap: firebaseUser.displayName || 'User',
                   email: firebaseUser.email || '',
-                  role: firebaseUser.email === 'asp.onshop@gmail.com' ? 'ADMIN' : 'PAC' as UserRole,
+                  role: firebaseUser.email === 'aliffahruddin@gmail.com' ? 'ADMIN' : 'PAC' as UserRole,
                   wilayah: 'PUSAT',
                 });
               }
