@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { apiRequest } from '@/src/lib/api';
+import { apiRequest, resolveUrl } from '@/src/lib/api';
 
 export default function MaintenancePage() {
   const { user } = useAuth();
@@ -51,18 +51,13 @@ export default function MaintenancePage() {
     setLoading(true);
     setStatus(null);
     try {
-      const token = localStorage.getItem('token');
       const formData = new FormData();
       formData.append('qris', file);
 
-      const response = await fetch('/api/config/qris', {
+      await apiRequest('/config/qris', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message || 'Gagal mengunggah QRIS');
 
       setStatus({ type: 'success', message: 'Gambar QRIS berhasil diperbarui.' });
       refreshConfig();
@@ -83,7 +78,7 @@ export default function MaintenancePage() {
       else if (type === 'full') url = '/api/admin/backup/full';
       else if (type === 'json') url = '/api/admin/export/tables';
 
-      const response = await fetch(`${url}?token=${token}`);
+      const response = await fetch(resolveUrl(`${url}?token=${token}`));
       if (!response.ok) throw new Error('Gagal mengunduh cadangan');
 
       const blob = await response.blob();
@@ -125,7 +120,7 @@ export default function MaintenancePage() {
         headers['Content-Type'] = 'application/json';
       }
 
-      const response = await fetch(url, {
+      const response = await fetch(resolveUrl(url), {
         method,
         headers,
         body

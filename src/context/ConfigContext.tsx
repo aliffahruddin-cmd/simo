@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiRequest } from '../lib/api';
+import { apiRequest, resolveUrl } from '../lib/api';
 import { useAuth } from './AuthContext';
 
 interface Permission {
@@ -38,10 +38,10 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       const data = await apiRequest('/config');
       setConfig({
         orgName: data.orgName || 'SIMAK',
-        logoUrl: data.logoUrl || '',
-        exportLogoUrl: data.exportLogoUrl || '',
+        logoUrl: resolveUrl(data.logoUrl),
+        exportLogoUrl: resolveUrl(data.exportLogoUrl),
         websiteUrl: data.websiteUrl || '',
-        qrisUrl: data.qrisUrl || '',
+        qrisUrl: resolveUrl(data.qrisUrl),
         merchantName: data.merchantName || 'LASKAR SANGIDU PUTIH',
       });
     } catch (err) {

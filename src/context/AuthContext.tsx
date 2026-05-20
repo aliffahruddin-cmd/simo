@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { auth, db, onAuthStateChanged, signOut } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { apiRequest } from '../lib/api';
 
 interface AuthContextType {
   user: User | null;
@@ -24,11 +25,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) return false;
 
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
+        const data = await apiRequest('/auth/me');
+        if (isMounted) {
           setUser({
             uid: data.id,
             noAnggota: data.no_anggota,

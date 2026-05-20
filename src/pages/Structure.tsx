@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiRequest } from '../lib/api';
+import { apiRequest, resolveUrl } from '../lib/api';
 import { 
   Table, 
   TableBody, 
@@ -294,7 +294,7 @@ export default function StructurePage() {
                 <div className="relative mb-4 inline-block">
                   <div className="w-20 h-20 mx-auto rounded-3xl bg-slate-50 border-2 border-white shadow-md overflow-hidden flex items-center justify-center relative z-10">
                     {profileUrl ? (
-                      <img src={profileUrl} alt={item.nama_lengkap} className="w-full h-full object-cover" />
+                      <img src={resolveUrl(profileUrl)} alt={item.nama_lengkap} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center justify-center opacity-20">
                         <User2 className="w-10 h-10" />

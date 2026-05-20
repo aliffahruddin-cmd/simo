@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { apiRequest } from '../lib/api';
+import { apiRequest, resolveUrl } from '../lib/api';
 import { Member } from '../types';
 import { 
   Table, 
@@ -570,7 +570,7 @@ export default function MembersPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
                       {m.foto_profile_url ? (
-                        <img src={m.foto_profile_url} alt="Avatar" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(m.foto_profile_url)} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
                         <UserCircle className="w-5 h-5 text-slate-400" />
                       )}
@@ -917,7 +917,7 @@ export default function MembersPage() {
                   <div className="shrink-0 flex flex-col items-center gap-4">
                     <div className="w-40 h-52 bg-slate-100 rounded-2xl border-4 border-white shadow-xl overflow-hidden flex items-center justify-center">
                       {selectedMember.foto_profile_url ? (
-                        <img src={selectedMember.foto_profile_url} alt="Avatar" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(selectedMember.foto_profile_url)} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
                         <UserCircle className="w-20 h-20 text-slate-300" />
                       )}
@@ -958,13 +958,13 @@ export default function MembersPage() {
                   </div>
                 </div>
 
-                {(user?.role === 'ADMIN' || user?.role === 'DPP' || user?.role === 'DPD') && selectedMember.foto_ektp_url && (
+                 {(user?.role === 'ADMIN' || user?.role === 'DPP' || user?.role === 'DPD') && selectedMember.foto_ektp_url && (
                   <div className="mt-8 pt-8 border-t border-slate-100">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Lampiran E-KTP</p>
                     <div className="relative group">
-                      <img src={selectedMember.foto_ektp_url} alt="KTP" className="w-full h-48 object-cover rounded-xl border border-slate-200 grayscale hover:grayscale-0 transition-all duration-300 shadow-sm" />
+                      <img src={resolveUrl(selectedMember.foto_ektp_url)} alt="KTP" className="w-full h-48 object-cover rounded-xl border border-slate-200 grayscale hover:grayscale-0 transition-all duration-300 shadow-sm" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                        <Button variant="secondary" size="sm" onClick={() => window.open(selectedMember.foto_ektp_url, '_blank')}>Lihat Resolusi Penuh</Button>
+                        <Button variant="secondary" size="sm" onClick={() => window.open(resolveUrl(selectedMember.foto_ektp_url), '_blank')}>Lihat Resolusi Penuh</Button>
                       </div>
                     </div>
                   </div>

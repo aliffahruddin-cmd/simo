@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useConfig } from './context/ConfigContext';
+import { apiRequest } from './lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,21 +58,10 @@ export default function Login() {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/login', {
+      const data = await apiRequest('/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ no_anggota: noAnggota, password })
+        body: { no_anggota: noAnggota, password }
       });
-
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text();
-        console.error('Non-JSON response:', text);
-        throw new Error('Server returned an unexpected format. Please try again later.');
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login gagal');
 
       // Save standard JWT to localStorage
       localStorage.setItem('token', data.token);

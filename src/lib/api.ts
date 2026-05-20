@@ -1,7 +1,42 @@
-const API_URL = import.meta.env.VITE_API_URL || '';
+const getApiUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (!hostname) return '';
+    
+    // Check if running in local environment, Cloud Run, or any Google Sandbox iframe
+    const isLocalOrSandbox = 
+      hostname.includes('localhost') || 
+      hostname.includes('127.0.0.1') || 
+      hostname.includes('run.app') || 
+      hostname.includes('aistudio') || 
+      hostname.includes('googleusercontent') || 
+      hostname.includes('withgoogle.com') ||
+      hostname.includes('google.com');
+
+    if (!isLocalOrSandbox) {
+      return 'https://ais-pre-lygy44gzfdl3sscb7yvlge-643827784442.asia-southeast1.run.app';
+    }
+  }
+  return '';
+};
+
+export const API_URL = getApiUrl();
+
+export function resolveUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  return `${API_URL}${url}`;
+}
 
 export async function apiRequest(endpoint: string, options: any = {}) {
   const token = localStorage.getItem('token');
+
   const headers: any = {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
