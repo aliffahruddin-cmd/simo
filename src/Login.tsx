@@ -311,6 +311,5 @@ export default function Login() {
 
       <DonateModal open={isQrisOpen} onOpenChange={setIsQrisOpen} />
     </div>
-
   );
 }

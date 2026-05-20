@@ -61,12 +61,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: 'Hak Akses', icon: Lock, path: '/permissions', key: 'permissions' },
     { name: 'Backup & Restore', icon: Server, path: '/maintenance', key: 'maintenance' },
     { name: 'System Console', icon: Settings, path: '/console', key: 'console' },
+    { name: 'Update Password Admin', icon: ShieldCheck, path: '/admin-password', key: 'admin-password' },
   ];
 
   const filteredNavItems = navItems.filter(item => {
     if (!user) return false;
     // Admin always sees everything, but let's respect the database anyway
-    if (user.role === 'ADMIN' && item.key === 'permissions') return true; // Safety for admin
+    if (user.role === 'ADMIN' && (item.key === 'permissions' || item.key === 'admin-password')) return true; // Safety for admin
     
     const perm = permissions.find(p => p.role === user.role && p.menu_key === item.key);
     return perm ? perm.is_allowed === 1 : false;

@@ -760,6 +760,27 @@ async function startServer() {
     }
   });
 
+  app.post("/api/admin/change-password", authenticate, isAdmin, async (req: any, res) => {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password minimal 6 karakter." });
+    }
+    
+    try {
+      const hashedPassword = bcrypt.hashSync(password, 10);
+      const result = db.prepare("UPDATE users SET password = ? WHERE no_anggota = 'admin' OR role = 'ADMIN'").run(hashedPassword);
+      
+      if (result.changes === 0) {
+        return res.status(404).json({ message: "User admin tidak ditemukan." });
+      }
+      
+      res.json({ success: true, message: "Password admin berhasil diperbarui." });
+    } catch (err: any) {
+      console.error("[ADMIN PASSWORD UPDATE ERROR]", err);
+      res.status(500).json({ message: "Gagal memperbarui password admin." });
+    }
+  });
+
   // --- Permissions Management ---
   app.get("/api/permissions", authenticate, (req: any, res) => {
     const perms = db.prepare("SELECT * FROM permissions").all();

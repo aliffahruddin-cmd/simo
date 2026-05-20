@@ -18,6 +18,7 @@ import ConsolePage from './pages/Console';
 import ReportsPage from './pages/Reports';
 import PermissionsPage from './pages/Permissions';
 import MaintenancePage from './pages/Maintenance';
+import AdminPasswordPage from './pages/AdminPassword';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -104,6 +105,14 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <MaintenancePage />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/admin-password" 
+              element={
+                <PrivateRoute>
+                  <AdminPasswordPage />
                 </PrivateRoute>
               } 
             />
