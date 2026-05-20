@@ -33,7 +33,7 @@ const getFirebaseConfig = () => {
 };
 const firebaseConfig = getFirebaseConfig();
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin (Deferred)
 let firebaseAdminApp: admin.app.App;
 
 function initFirebase() {
@@ -46,48 +46,40 @@ function initFirebase() {
   const targetProjectId = config.projectId;
   
   try {
-    // 1. Try to find if we already have an app with this project ID
     const existingApp = admin.apps.find(a => a?.options.projectId === targetProjectId);
     
     if (existingApp) {
       firebaseAdminApp = existingApp;
-      console.log(`[FIREBASE] Reusing existing admin app for: ${targetProjectId}`);
     } else {
-      // 2. If not, we initialize a new one. 
-      // We use a unique name if the default app is already taken by a different project
       const hasDefaultApp = admin.apps.length > 0 && admin.apps.find(a => a?.name === "[DEFAULT]");
       const useDefault = !hasDefaultApp || (admin.app().options.projectId === targetProjectId);
       
       if (useDefault) {
-        console.log(`[FIREBASE] Initializing DEFAULT admin app for: ${targetProjectId}`);
         firebaseAdminApp = admin.initializeApp({
           projectId: targetProjectId
         });
       } else {
         const name = `app-${targetProjectId}-${Date.now()}`;
-        console.log(`[FIREBASE] Initializing NAMED admin app [${name}] for: ${targetProjectId}`);
         firebaseAdminApp = admin.initializeApp({
           projectId: targetProjectId
         }, name);
       }
     }
     
-    // Always set this to help other GCP SDKs if they are used implicitly
     process.env.GOOGLE_CLOUD_PROJECT = targetProjectId;
     console.log(`[FIREBASE] Admin active project: ${firebaseAdminApp?.options?.projectId}`);
   } catch (e: any) {
     console.error("[FIREBASE] Admin Init error:", e.message);
-    // Fallback to whatever is available
     if (!firebaseAdminApp && admin.apps.length > 0) {
       firebaseAdminApp = admin.app();
     }
   }
 }
-initFirebase();
 
-// Initialize Client SDK on Server (to bypass ADC project mismatch issues for specific tests)
+// Initialize Client SDK on Server (Deferred)
 let clientApp: any;
 let clientFirestore: any;
+
 function initClientFirebase() {
     const config = getFirebaseConfig();
     if (!config) return;
@@ -99,7 +91,6 @@ function initClientFirebase() {
             clientApp = initializeClientApp(config);
         }
         
-        // Use initializeFirestore with forceLongPolling to resolve connection issues in restricted environments
         clientFirestore = initializeClientFirestore(clientApp, {
             experimentalForceLongPolling: true,
         }, config.firestoreDatabaseId);
@@ -109,7 +100,7 @@ function initClientFirebase() {
         console.error("[FIREBASE] Client SDK Init error:", e.message);
     }
 }
-initClientFirebase();
+// Do NOT call them at top level to avoid blocking module load
 
 // Proxies for auth and firestore to ensure they always use the latest firebaseAdminApp
 const getAuthService = () => firebaseAdminApp ? getAuth(firebaseAdminApp) : null;
@@ -220,6 +211,20 @@ async function startServer() {
   const app = express();
   app.set("trust proxy", true);
 
+  // START LISTENING IMMEDIATELY
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`[SERVER] Express instance listening on port ${PORT}`);
+  });
+
+  // Background initialization to avoid blocking the main thread
+  (async () => {
+    initFirebase();
+    initClientFirebase();
+    auth = getAuthService();
+    firestore = getFirestoreService();
+    console.log("[FIREBASE] Services initialized in background.");
+  })();
+
   // 1. Permissive CORS (RELY ON THIS EXCLUSIVELY)
   app.use(cors({
     origin: (origin, callback) => callback(null, true), // Allow all origins
@@ -258,11 +263,6 @@ async function startServer() {
 
   // 4. Static Uploads
   app.use("/uploads", express.static(uploadDir));
-
-  // --- Start Listening NOW to avoid platform timeout ---
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[SERVER] Express instance listening on port ${PORT}`);
-  });
 
   // Startup check for Firestore (Non-blocking)
   const startupConfig = getFirebaseConfig();
