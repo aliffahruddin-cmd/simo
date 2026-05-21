@@ -228,7 +228,7 @@ async function startServer() {
   // 1. Dynamic Permissive CORS (Manual implementation for absolute reliability)
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && origin !== "null" && origin !== "*") {
+    if (origin && origin !== "*") {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Credentials", "true");
     } else {
@@ -239,6 +239,13 @@ async function startServer() {
     res.setHeader("Access-Control-Expose-Headers", "Content-Range, X-Content-Range, Content-Length, Accept-Ranges");
     res.setHeader("Access-Control-Max-Age", "86400");
     res.setHeader("Vary", "Origin");
+
+    // Prevent caching of any API error responses or platform fallback pages
+    if (req.path.startsWith('/api/')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
 
     if (req.method === "OPTIONS") {
       return res.status(200).end();
@@ -627,7 +634,7 @@ async function startServer() {
 
   app.get("/api/users", authenticate, isAdmin, async (req: any, res) => {
     try {
-      const users = db.prepare("SELECT id, no_anggota, email, nama_lengkap, role, wilayah, created_at FROM users").all() as any[];
+      const users = db.prepare("SELECT id, no_anggota, email, nama_lengkap, role, wilayah, github, created_at FROM users").all() as any[];
       
       // Check sync status for each user if Firebase is accessible
       const usersWithStatus = await Promise.all(users.map(async (u) => {
@@ -656,7 +663,7 @@ async function startServer() {
   });
 
   app.post("/api/users", authenticate, isAdmin, async (req: any, res) => {
-    const { no_anggota, email, nama_lengkap, password, role, wilayah } = req.body;
+    const { no_anggota, email, nama_lengkap, password, role, wilayah, github } = req.body;
     console.log(`[USER CREATE] Attempting to create user: ${no_anggota} (${email})`);
     
     if (!password || password.length < 6) {
@@ -709,8 +716,8 @@ async function startServer() {
         return res.status(400).json({ message: "Harus mencantumkan Email atau No. Anggota" });
       }
 
-      db.prepare("INSERT INTO users (id, no_anggota, email, nama_lengkap, password, role, wilayah) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(firebaseUid, cleanNoAnggota, cleanEmail, nama_lengkap, hashedPassword, role, wilayah);
+      db.prepare("INSERT INTO users (id, no_anggota, email, nama_lengkap, password, role, wilayah, github) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .run(firebaseUid, cleanNoAnggota, cleanEmail, nama_lengkap, hashedPassword, role, wilayah, github);
 
       if (fbCreated && auth) {
         await auth.setCustomUserClaims(firebaseUid, { role, wilayah }).catch(e => console.error("Claim set failed", e.message));
@@ -725,6 +732,7 @@ async function startServer() {
             nama_lengkap,
             role,
             wilayah,
+            github,
             created_at: FieldValue.serverTimestamp()
           });
         }
@@ -752,18 +760,34 @@ async function startServer() {
     }
   });
 
-  app.put("/api/users/:id", authenticate, isAdmin, (req: any, res) => {
-    const { no_anggota, nama_lengkap, password, role, wilayah } = req.body;
+  app.put("/api/users/:id", authenticate, isAdmin, async (req: any, res) => {
+    const { no_anggota, nama_lengkap, password, role, wilayah, github } = req.body;
     try {
       console.log(`[USER UPDATE] ID: ${req.params.id}, No: ${no_anggota}, Name: ${nama_lengkap}`);
       if (password && password.trim() !== "") {
         const hashedPassword = bcrypt.hashSync(password, 10);
-        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, password = ?, role = ?, wilayah = ? WHERE id = ?")
-          .run(no_anggota, nama_lengkap, hashedPassword, role, wilayah, req.params.id);
+        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, password = ?, role = ?, wilayah = ?, github = ? WHERE id = ?")
+          .run(no_anggota, nama_lengkap, hashedPassword, role, wilayah, github, req.params.id);
       } else {
-        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, role = ?, wilayah = ? WHERE id = ?")
-          .run(no_anggota, nama_lengkap, role, wilayah, req.params.id);
+        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, role = ?, wilayah = ?, github = ? WHERE id = ?")
+          .run(no_anggota, nama_lengkap, role, wilayah, github, req.params.id);
       }
+
+      // Sync with Firestore
+      try {
+        if (firestore) {
+          await firestore.collection("users").doc(req.params.id).set({
+            no_anggota,
+            nama_lengkap,
+            role,
+            wilayah,
+            github
+          }, { merge: true });
+        }
+      } catch (e: any) {
+        handleFirestoreError(e, OperationType.UPDATE, `users/${req.params.id}`, req.user?.id);
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error("[USER UPDATE ERROR]", err);
@@ -1406,8 +1430,8 @@ async function startServer() {
       const existing = db.prepare("SELECT * FROM users WHERE no_anggota = ?").get(no) as any;
       if (!existing) {
         const hashedPassword = bcrypt.hashSync(pass, 10);
-        db.prepare("INSERT INTO users (id, no_anggota, nama_lengkap, password, role, wilayah) VALUES (?, ?, ?, ?, ?, ?)")
-          .run(id, no, name, hashedPassword, role, vil);
+        db.prepare("INSERT INTO users (id, no_anggota, nama_lengkap, password, role, wilayah, github) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(id, no, name, hashedPassword, role, vil, null);
         console.log(`[SEED] Created user ${no}`);
       } else {
         // Just update password/role to be sure
@@ -1425,8 +1449,9 @@ async function startServer() {
           nama_lengkap: name,
           role: role,
           wilayah: vil,
+          github: null,
           created_at: FieldValue.serverTimestamp()
-        }).catch((e: any) => {
+        }, { merge: true }).catch((e: any) => {
           if (!e.message.includes("PERMISSION_DENIED")) {
              console.log(`[SEED FS] Failed to sync ${no}: ${e.message}`);
           }

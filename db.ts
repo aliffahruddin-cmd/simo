@@ -26,6 +26,7 @@ db.exec(`
     password TEXT,
     role TEXT,
     wilayah TEXT,
+    github TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -82,6 +83,11 @@ db.exec(`
     PRIMARY KEY (role, menu_key)
   );
 `);
+
+// Migration: Add github column if it doesn't exist
+try {
+  db.exec("ALTER TABLE users ADD COLUMN github TEXT;");
+} catch (e) {}
 
 // Sync default permissions
 const allMenus = ['dashboard', 'members', 'structure', 'finance', 'users', 'reports', 'console', 'permissions', 'maintenance'];
