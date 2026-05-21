@@ -33,7 +33,7 @@ const getFirebaseConfig = () => {
 };
 const firebaseConfig = getFirebaseConfig();
 
-// Initialize Firebase Admin (Deferred)
+// Initialize Firebase Admin
 let firebaseAdminApp: admin.app.App;
 
 function initFirebase() {
@@ -46,40 +46,48 @@ function initFirebase() {
   const targetProjectId = config.projectId;
   
   try {
+    // 1. Try to find if we already have an app with this project ID
     const existingApp = admin.apps.find(a => a?.options.projectId === targetProjectId);
     
     if (existingApp) {
       firebaseAdminApp = existingApp;
+      console.log(`[FIREBASE] Reusing existing admin app for: ${targetProjectId}`);
     } else {
+      // 2. If not, we initialize a new one. 
+      // We use a unique name if the default app is already taken by a different project
       const hasDefaultApp = admin.apps.length > 0 && admin.apps.find(a => a?.name === "[DEFAULT]");
       const useDefault = !hasDefaultApp || (admin.app().options.projectId === targetProjectId);
       
       if (useDefault) {
+        console.log(`[FIREBASE] Initializing DEFAULT admin app for: ${targetProjectId}`);
         firebaseAdminApp = admin.initializeApp({
           projectId: targetProjectId
         });
       } else {
         const name = `app-${targetProjectId}-${Date.now()}`;
+        console.log(`[FIREBASE] Initializing NAMED admin app [${name}] for: ${targetProjectId}`);
         firebaseAdminApp = admin.initializeApp({
           projectId: targetProjectId
         }, name);
       }
     }
     
+    // Always set this to help other GCP SDKs if they are used implicitly
     process.env.GOOGLE_CLOUD_PROJECT = targetProjectId;
     console.log(`[FIREBASE] Admin active project: ${firebaseAdminApp?.options?.projectId}`);
   } catch (e: any) {
     console.error("[FIREBASE] Admin Init error:", e.message);
+    // Fallback to whatever is available
     if (!firebaseAdminApp && admin.apps.length > 0) {
       firebaseAdminApp = admin.app();
     }
   }
 }
+initFirebase();
 
-// Initialize Client SDK on Server (Deferred)
+// Initialize Client SDK on Server (to bypass ADC project mismatch issues for specific tests)
 let clientApp: any;
 let clientFirestore: any;
-
 function initClientFirebase() {
     const config = getFirebaseConfig();
     if (!config) return;
@@ -91,6 +99,7 @@ function initClientFirebase() {
             clientApp = initializeClientApp(config);
         }
         
+        // Use initializeFirestore with forceLongPolling to resolve connection issues in restricted environments
         clientFirestore = initializeClientFirestore(clientApp, {
             experimentalForceLongPolling: true,
         }, config.firestoreDatabaseId);
@@ -100,7 +109,7 @@ function initClientFirebase() {
         console.error("[FIREBASE] Client SDK Init error:", e.message);
     }
 }
-// Do NOT call them at top level to avoid blocking module load
+initClientFirebase();
 
 // Proxies for auth and firestore to ensure they always use the latest firebaseAdminApp
 const getAuthService = () => firebaseAdminApp ? getAuth(firebaseAdminApp) : null;
@@ -211,47 +220,15 @@ async function startServer() {
   const app = express();
   app.set("trust proxy", true);
 
-  // START LISTENING IMMEDIATELY
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[SERVER] Express instance listening on port ${PORT}`);
-  });
-
-  // Background initialization to avoid blocking the main thread
-  (async () => {
-    initFirebase();
-    initClientFirebase();
-    auth = getAuthService();
-    firestore = getFirestoreService();
-    console.log("[FIREBASE] Services initialized in background.");
-  })();
-
-  // 1. Dynamic Permissive CORS (Manual implementation for absolute reliability)
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin && origin !== "*") {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    } else {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-    }
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Range");
-    res.setHeader("Access-Control-Expose-Headers", "Content-Range, X-Content-Range, Content-Length, Accept-Ranges");
-    res.setHeader("Access-Control-Max-Age", "86400");
-    res.setHeader("Vary", "Origin");
-
-    // Prevent caching of any API error responses or platform fallback pages
-    if (req.path.startsWith('/api/')) {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-
-    if (req.method === "OPTIONS") {
-      return res.status(200).end();
-    }
-    next();
-  });
+  // 1. Permissive CORS (RELY ON THIS EXCLUSIVELY)
+  app.use(cors({
+    origin: (origin, callback) => callback(null, true), // Allow all origins
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    credentials: true,
+    maxAge: 86400
+  }));
 
   // 2. Global logger and JSON enforcer
   app.use((req, res, next) => {
@@ -373,7 +350,7 @@ async function startServer() {
                 id: decodedToken.uid,
                 email: email,
                 no_anggota: 'G-' + decodedToken.uid.substring(0, 5),
-                role: (email && email === 'aliffahruddin@gmail.com') ? 'ADMIN' : "PAC",
+                role: (email && email === 'asp.onshop@gmail.com') ? 'ADMIN' : "PAC",
                 wilayah: "PUSAT",
                 nama_lengkap: decodedToken.name || "Firebase Guest",
                 extra_email: email
@@ -634,7 +611,7 @@ async function startServer() {
 
   app.get("/api/users", authenticate, isAdmin, async (req: any, res) => {
     try {
-      const users = db.prepare("SELECT id, no_anggota, email, nama_lengkap, role, wilayah, github, created_at FROM users").all() as any[];
+      const users = db.prepare("SELECT id, no_anggota, email, nama_lengkap, role, wilayah, created_at FROM users").all() as any[];
       
       // Check sync status for each user if Firebase is accessible
       const usersWithStatus = await Promise.all(users.map(async (u) => {
@@ -663,7 +640,7 @@ async function startServer() {
   });
 
   app.post("/api/users", authenticate, isAdmin, async (req: any, res) => {
-    const { no_anggota, email, nama_lengkap, password, role, wilayah, github } = req.body;
+    const { no_anggota, email, nama_lengkap, password, role, wilayah } = req.body;
     console.log(`[USER CREATE] Attempting to create user: ${no_anggota} (${email})`);
     
     if (!password || password.length < 6) {
@@ -716,8 +693,8 @@ async function startServer() {
         return res.status(400).json({ message: "Harus mencantumkan Email atau No. Anggota" });
       }
 
-      db.prepare("INSERT INTO users (id, no_anggota, email, nama_lengkap, password, role, wilayah, github) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .run(firebaseUid, cleanNoAnggota, cleanEmail, nama_lengkap, hashedPassword, role, wilayah, github);
+      db.prepare("INSERT INTO users (id, no_anggota, email, nama_lengkap, password, role, wilayah) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run(firebaseUid, cleanNoAnggota, cleanEmail, nama_lengkap, hashedPassword, role, wilayah);
 
       if (fbCreated && auth) {
         await auth.setCustomUserClaims(firebaseUid, { role, wilayah }).catch(e => console.error("Claim set failed", e.message));
@@ -732,7 +709,6 @@ async function startServer() {
             nama_lengkap,
             role,
             wilayah,
-            github,
             created_at: FieldValue.serverTimestamp()
           });
         }
@@ -760,59 +736,22 @@ async function startServer() {
     }
   });
 
-  app.put("/api/users/:id", authenticate, isAdmin, async (req: any, res) => {
-    const { no_anggota, nama_lengkap, password, role, wilayah, github } = req.body;
+  app.put("/api/users/:id", authenticate, isAdmin, (req: any, res) => {
+    const { no_anggota, nama_lengkap, password, role, wilayah } = req.body;
     try {
       console.log(`[USER UPDATE] ID: ${req.params.id}, No: ${no_anggota}, Name: ${nama_lengkap}`);
       if (password && password.trim() !== "") {
         const hashedPassword = bcrypt.hashSync(password, 10);
-        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, password = ?, role = ?, wilayah = ?, github = ? WHERE id = ?")
-          .run(no_anggota, nama_lengkap, hashedPassword, role, wilayah, github, req.params.id);
+        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, password = ?, role = ?, wilayah = ? WHERE id = ?")
+          .run(no_anggota, nama_lengkap, hashedPassword, role, wilayah, req.params.id);
       } else {
-        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, role = ?, wilayah = ?, github = ? WHERE id = ?")
-          .run(no_anggota, nama_lengkap, role, wilayah, github, req.params.id);
+        db.prepare("UPDATE users SET no_anggota = ?, nama_lengkap = ?, role = ?, wilayah = ? WHERE id = ?")
+          .run(no_anggota, nama_lengkap, role, wilayah, req.params.id);
       }
-
-      // Sync with Firestore
-      try {
-        if (firestore) {
-          await firestore.collection("users").doc(req.params.id).set({
-            no_anggota,
-            nama_lengkap,
-            role,
-            wilayah,
-            github
-          }, { merge: true });
-        }
-      } catch (e: any) {
-        handleFirestoreError(e, OperationType.UPDATE, `users/${req.params.id}`, req.user?.id);
-      }
-
       res.json({ success: true });
     } catch (err: any) {
       console.error("[USER UPDATE ERROR]", err);
       res.status(400).json({ message: err.message });
-    }
-  });
-
-  app.post("/api/admin/change-password", authenticate, isAdmin, async (req: any, res) => {
-    const { password } = req.body;
-    if (!password || password.length < 6) {
-      return res.status(400).json({ message: "Password minimal 6 karakter." });
-    }
-    
-    try {
-      const hashedPassword = bcrypt.hashSync(password, 10);
-      const result = db.prepare("UPDATE users SET password = ? WHERE no_anggota = 'admin' OR role = 'ADMIN'").run(hashedPassword);
-      
-      if (result.changes === 0) {
-        return res.status(404).json({ message: "User admin tidak ditemukan." });
-      }
-      
-      res.json({ success: true, message: "Password admin berhasil diperbarui." });
-    } catch (err: any) {
-      console.error("[ADMIN PASSWORD UPDATE ERROR]", err);
-      res.status(500).json({ message: "Gagal memperbarui password admin." });
     }
   });
 
@@ -1424,14 +1363,14 @@ async function startServer() {
     }
   });
 
-  // -- Improved Seeding Section (Non-blocking) --
-  const seedUser = async (id: string, no: string, name: string, pass: string, role: string, vil: string) => {
+  // -- Improved Seeding Section --
+  const seedUser = (id: string, no: string, name: string, pass: string, role: string, vil: string) => {
     try {
       const existing = db.prepare("SELECT * FROM users WHERE no_anggota = ?").get(no) as any;
       if (!existing) {
         const hashedPassword = bcrypt.hashSync(pass, 10);
-        db.prepare("INSERT INTO users (id, no_anggota, nama_lengkap, password, role, wilayah, github) VALUES (?, ?, ?, ?, ?, ?, ?)")
-          .run(id, no, name, hashedPassword, role, vil, null);
+        db.prepare("INSERT INTO users (id, no_anggota, nama_lengkap, password, role, wilayah) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(id, no, name, hashedPassword, role, vil);
         console.log(`[SEED] Created user ${no}`);
       } else {
         // Just update password/role to be sure
@@ -1449,9 +1388,8 @@ async function startServer() {
           nama_lengkap: name,
           role: role,
           wilayah: vil,
-          github: null,
           created_at: FieldValue.serverTimestamp()
-        }, { merge: true }).catch((e: any) => {
+        }).catch((e: any) => {
           if (!e.message.includes("PERMISSION_DENIED")) {
              console.log(`[SEED FS] Failed to sync ${no}: ${e.message}`);
           }
@@ -1462,23 +1400,18 @@ async function startServer() {
     }
   };
 
-  // Run Seeding in background
-  (async () => {
-    console.log("[SEED] Starting background seeding...");
-    // Seed Admin
-    await seedUser(uuidv4(), "admin", "Admin System", "Anggra09", "ADMIN", "PUSAT");
-    
-    // Seed Alif
-    await seedUser(uuidv4(), "alif", "Alif User", "password123", "PAC", "PUSAT");
+  // Seed Admin
+  seedUser(uuidv4(), "admin", "Admin System", "Anggra09", "ADMIN", "PUSAT");
+  
+  // Seed Alif
+  seedUser(uuidv4(), "alif", "Alif User", "password123", "PAC", "PUSAT");
 
-    // Seed default configs
-    const configExists = db.prepare("SELECT count(*) as count FROM config WHERE key = 'orgName'").get() as { count: number };
-    if (configExists.count === 0) {
-        db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("orgName", "SIMO - SISTEM INFORMASI MANAJEMEN ORGANISASI");
-        db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("logoUrl", "");
-    }
-    console.log("[SEED] Background seeding completed.");
-  })();
+  // Seed default configs
+  const configExists = db.prepare("SELECT count(*) as count FROM config WHERE key = 'orgName'").get() as { count: number };
+  if (configExists.count === 0) {
+    db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("orgName", "SIMO - SISTEM INFORMASI MANAJEMEN ORGANISASI");
+    db.prepare("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)").run("logoUrl", "");
+  }
 
   app.use((err: any, req: any, res: any, next: any) => {
     console.error('Server Internal Error:', err);
@@ -1505,24 +1438,27 @@ async function startServer() {
 
   // --- Vite / Production Serve ---
   if (process.env.NODE_ENV !== "production") {
-    console.log("[VITE] Initializing Vite middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-    console.log("[VITE] Middleware ready.");
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    if (fs.existsSync(distPath)) {
-      app.use(express.static(distPath));
-      app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
-    } else {
-      console.warn("[SERVER] Warning: dist folder not found in production mode!");
-    }
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
+
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ message: err.message || 'Internal Server Error' });
+  });
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
 startServer().catch(err => {
